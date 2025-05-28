@@ -87,6 +87,7 @@ def column_1_map_n_logo(entries, col1):
             st.info("No valid location data available to display on the map.")
 
 
+@st.cache_data(ttl=450)  # Cache for 1 hour (3600 seconds)
 def get_data_from_thing():
     response = requests.get(API_URL)
     json_data = response.json()
