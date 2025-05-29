@@ -11,7 +11,7 @@ import json
 API_URL = "https://five.epicollect.net/api/export/entries/ratext-academy?form_ref=216f96d4dddf431789397be865cc113d_6810df39b9ee1"
 API_TOKEN = "hcZ3P1KhuOvTmC7MvqnMj38LNF0xGtyjJQXEzZ01" # what is data safety?
 
-API_URL = " 	https://five.epicollect.net/api/export/project/ratext-academy"  # Replace with your actual data endpoint
+# API_URL = "https://five.epicollect.net/api/export/project/ratext-academy"  # Replace with your actual data endpoint
 CLIENT_ID = 6427
 CLIENT_SECRET = "KIdLBg0ZCLLRLpmbXMuYeddvJ1VUBAAdRLcs26VX"
 
@@ -116,6 +116,7 @@ def get_epicollect_token(client_id, client_secret):
         return token_data.get("access_token"), token_data.get("expires_in")
     else:
         raise Exception(f"Failed to retrieve token: {response.status_code} {response.text}")
+
 
 # Updated data fetching function with Authorization header
 def get_data_from_thing(api_url=API_URL,client_id = CLIENT_ID ,client_secret= CLIENT_SECRET):
