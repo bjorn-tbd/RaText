@@ -132,8 +132,6 @@ def get_data_from_thing(api_url=API_URL,client_id = CLIENT_ID ,client_secret= CL
 
     json_data = response.json() # json response now broken, fix later. 
 
-    st.write(json_data)
-
     entries = json_data["data"]["entries"]
 
     batch_map = {entry["3_batchnumber"]: entry for entry in entries if entry.get("3_batchnumber")}
