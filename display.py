@@ -8,6 +8,8 @@ from streamlit_folium import st_folium
 
 
 API_URL = "https://five.epicollect.net/api/export/entries/ratext-academy?form_ref=216f96d4dddf431789397be865cc113d_6810df39b9ee1"
+API_TOKEN = "216f96d4dddf431789397be865cc113d_6810df39b9ee1" # what is data safety?
+
 
 st.set_page_config(layout="wide")
 def main():
@@ -87,15 +89,16 @@ def column_1_map_n_logo(entries, col1):
             st.info("No valid location data available to display on the map.")
 
 
-@st.cache_data(ttl=450)  # Cache for 1 hour (3600 seconds)
+@st.cache_data(ttl=450)  # Cache for 450 seconds
 def get_data_from_thing():
-    response = requests.get(API_URL)
+    headers = {
+        "Authorization": f"Bearer {API_TOKEN}"
+    }
+
+    response = requests.get(API_URL, headers=headers)
+    response.raise_for_status()  # Raises an error if the response status is not 200
     json_data = response.json()
     entries = json_data["data"]["entries"]
 
     batch_map = {entry["3_batchnumber"]: entry for entry in entries if entry.get("3_batchnumber")}
     return batch_map, entries
-
-
-if __name__ == "__main__":
-    main()
