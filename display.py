@@ -96,8 +96,7 @@ def column_1_map_n_logo(entries, col1):
             st.info("No valid location data available to display on the map.")
 
 
-# @st.cache_data(ttl=450)  # Cache for 450 seconds
-# Your existing token function
+@st.cache_data(ttl=1800)  # Cache for 450 seconds
 def get_epicollect_token(client_id, client_secret):
     url = "https://five.epicollect.net/api/oauth/token"
     params = {
