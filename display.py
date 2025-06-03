@@ -16,7 +16,7 @@ CLIENT_ID = 6427
 CLIENT_SECRET = "KIdLBg0ZCLLRLpmbXMuYeddvJ1VUBAAdRLcs26VX"
 
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_icon="./resources/mini.png", page_title="DART Dashboard")
 def main():
     st.title("**D**AR & **T**")
     st.markdown("**D**ashboard **A**carice **R**esistance & **T**racking")
@@ -24,14 +24,9 @@ def main():
     try:
         # Assuming this returns the JSON structure as described
         batch_map, entries = get_data_from_thing()
-
-        print(entries)
-
-
         col1, col2 = st.columns([1, 3])
 
         column_1_map_n_logo(entries, col1)
-
         with col2:
             #todo: extract acarice data earlier than currently, so we can use it for the circle diagrams. 
             RaT_boxnumbers = sorted(batch_map.keys())
@@ -40,11 +35,9 @@ def main():
             ]
             mortality_data = calculate_mortality_percentages(mortality_data)
 
-
             show_mortality_charts(mortality_data)
             box_picker(batch_map)
 
-            print("done")
 
     except Exception as e:
         st.error(f"Failed to load data from API: {e}")
@@ -65,33 +58,25 @@ def box_picker(batch_map):
 def column_1_map_n_logo(entries, col1):
     with col1:
         st.image("./resources/logo.png")
-        # --- Overview Map Component ---
         st.subheader("Overview Map of Entries")
 
-        map_center = [0.0, 0.0]  # Default center; can adjust based on data
-        overview_map = folium.Map(location=map_center, zoom_start=2)
-
-        has_location = False
+        # Extract valid coordinates
+        coords = []
         for entry in entries:
-            loc = entry.get("4_location", {})
-            lat, lon = loc.get("latitude"), loc.get("longitude")
+            loc = entry.get("17_location", {}) #TODO: make this dynamic, so we can use it for other entries.
+            lat = loc.get("latitude")
+            lon = loc.get("longitude")
 
             try:
                 lat = float(lat)
                 lon = float(lon)
-                has_location = True
-
-                folium.Marker(
-                        location=[lat, lon],
-                        popup=f"Batch: {entry['3_batchnumber']}\nName: {entry['2_name']}",
-                        tooltip=entry['3_batchnumber']
-                    ).add_to(overview_map)
-
+                coords.append({"latitude": lat, "longitude": lon})
             except (TypeError, ValueError):
-                continue  # Skip entries with invalid coordinates
+                continue
 
-        if has_location:
-            st_folium(overview_map, width=700)
+        if coords:
+            df = pd.DataFrame(coords)
+            st.map(df)
         else:
             st.info("No valid location data available to display on the map.")
 
@@ -133,7 +118,7 @@ def get_data_from_thing(api_url=API_URL,client_id = CLIENT_ID ,client_secret= CL
 
     entries = json_data["data"]["entries"]
 
-    batch_map = {entry["3_batchnumber"]: entry for entry in entries if entry.get("3_batchnumber")}
+    batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
     return batch_map, entries
 
 main()

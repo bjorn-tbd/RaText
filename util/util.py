@@ -1,50 +1,89 @@
 import pandas as pd
-
+import re
 
 def extract_concentration_data(entry: dict) -> pd.DataFrame:
-    all_data = []
+    data = []
+    # Extract all relevant keys and sort by numeric prefix
+    pattern = re.compile(r'^(\d+)_')
+    sorted_items = sorted(
+        ((int(pattern.match(k).group(1)), k, v) for k, v in entry.items() if pattern.match(k)),
+        key=lambda x: x[0]
+    )
 
-    for i in range(7):  # 7 strips
-        offsets = [0, 9, 18, 27, 36, 45, 54, 63, 72]
-        base_index = offsets[i]
-        row = {"Strip": f"Strip {i + 1}"}
+    # Initialize row data
+    row = {}
+    strip_num = 1
+    block_count = 0  # Each strip has 4 blocks: Control, 1x, 5x, 10x
+    conc_labels = ["Control", "1x", "5x", "10x"]
 
-        pairs = {
-            "Control": (f"{12 + base_index}_Control_alive", f"{13 + base_index}_Control_dead"),
-            "1x": (f"{14 + base_index}_rc_1x_alive", f"{15 + base_index}_rc_1x_dead"),
-            "5x": (f"{16 + base_index}_rc_5x_alive", f"{17 + base_index}_rc_5x_dead"),
-            "10x": (f"{18 + base_index}_rc_10x_alive", f"{19 + base_index}_rc_10x_dead"),
-        }
+    # Temporarily store values to identify grouping
+    temp_block = {}
 
-        for conc, (alive_col, dead_col) in pairs.items():
-            row[f"{conc}_Alive"] = entry.get(alive_col, "")
-            row[f"{conc}_Dead"] = entry.get(dead_col, "")
+    for _, key, value in sorted_items:
+        name = key.split("_", 1)[-1]
 
-        all_data.append(row)
+        if "Control_tic" in name:
+            label = conc_labels[block_count % 4]
+            if f"{label}_Alive" not in temp_block:
+                temp_block[f"{label}_Alive"] = value
+            else:
+                temp_block[f"{label}_Dead"] = value
 
-    return pd.DataFrame(all_data)
+        elif "ticks_alive" in name:
+            label = conc_labels[block_count % 4]
+            temp_block[f"{label}_Alive"] = value
+
+        elif "ticks_dead" in name:
+            label = conc_labels[block_count % 4]
+            temp_block[f"{label}_Dead"] = value
+            block_count += 1
+
+            # After every 4 blocks, we complete a strip
+            if block_count % 4 == 0:
+                temp_block["Strip"] = f"Strip {strip_num}"
+                data.append(temp_block)
+                temp_block = {}
+                strip_num += 1
+
+    return pd.DataFrame(data)
 
 
-def calculate_mortality_percentages(mortality_data: pd.DataFrame) -> pd.DataFrame:
-    """ Calculate mortality percentages for each concentration in the DataFrame.
+def calculate_mortality_percentages(mortality_data: list[tuple[str, pd.DataFrame]]) -> list[tuple[str, pd.DataFrame]]:
+    """
+    Calculate mortality percentages for each concentration in the DataFrame.
+
     Args:
-        df (pd.DataFrame): DataFrame containing alive and dead counts for each concentration.
+        mortality_data (list): List of (box_id, DataFrame) tuples containing alive and dead counts.
 
     Returns:
-        pd.DataFrame: DataFrame with additional columns for mortality percentages.
+        list: Updated list with mortality percentages added to each DataFrame.
     """
     new_mortality_data = []
+
+
     for box_id, df in mortality_data:
-        df = df.copy()  # avoid modifying original
-        for conc in ["1x", "5x", "10x"]:
+        df = df.copy()
+
+        # Automatically find concentration labels (e.g., "1x", "5x", "10x")
+        concs = set()
+        for col in df.columns:
+            if "_Alive" in col:
+                conc = col.replace("_Alive", "")
+                if f"{conc}_Dead" in df.columns:
+                    concs.add(conc)
+
+        for conc in sorted(concs):  # consistent order
             alive_col = f"{conc}_Alive"
             dead_col = f"{conc}_Dead"
             mortality_col = f"{conc}_Mortality (%)"
 
             df[mortality_col] = df.apply(
-                lambda row: (row[dead_col] / (row[alive_col] + row[dead_col]) * 100)
-                if (row[alive_col] + row[dead_col]) > 0 else 0.0,
+                lambda row: (
+                    (row[dead_col] / (row[alive_col] + row[dead_col]) * 100)
+                    if (row.get(alive_col, 0) + row.get(dead_col, 0)) > 0 else 0.0
+                ),
                 axis=1
             )
+
         new_mortality_data.append((box_id, df))
     return new_mortality_data
