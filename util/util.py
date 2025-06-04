@@ -1,5 +1,10 @@
 import pandas as pd
 import re
+import json
+import geopandas as gpd
+from shapely.geometry import Point
+import streamlit as st
+
 
 def extract_concentration_data(entry: dict) -> pd.DataFrame:
     data = []
@@ -87,3 +92,61 @@ def calculate_mortality_percentages(mortality_data: list[tuple[str, pd.DataFrame
 
         new_mortality_data.append((box_id, df))
     return new_mortality_data
+
+
+
+def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json"):
+    gdf_regions = gpd.read_file(geojson_path)  # Load regions only once
+
+    # Create a DataFrame from all data_tuples
+    records = []
+    for batch_name, df, loc in data_tuples:
+        if loc is None:
+            continue
+        point = Point(loc["longitude"], loc["latitude"])
+        for _, row in df.iterrows():
+            records.append({
+                "geometry": point,
+                "1x": row["1x_Mortality (%)"],
+                "5x": row["5x_Mortality (%)"],
+                "10x": row["10x_Mortality (%)"]
+            })
+
+    if not records:
+        return None, None, None
+
+    gdf_data = gpd.GeoDataFrame(records, crs="EPSG:4326")
+
+    # Spatial join: match points to regions
+    gdf_joined = gpd.sjoin(gdf_data, gdf_regions, how="inner", predicate="intersects")
+
+
+
+    # TODO: fix this part, the fkin geojson_path is not working
+    # st.write(geojson_path)
+    # Determine the region column to use for grouping
+    if "NAME_1" in gdf_joined.columns:
+        region_column = "NAME_1"
+        unified_region_column = "region"
+        gdf_joined = gdf_joined.rename(columns={"NAME_1": unified_region_column})
+    elif "NAME" in gdf_joined.columns:
+        region_column = "NAME"
+        unified_region_column = "region"
+        gdf_joined = gdf_joined.rename(columns={"NAME": unified_region_column})
+    elif "name" in gdf_joined.columns:
+        region_column = "name"
+        unified_region_column = "region"
+        gdf_joined = gdf_joined.rename(columns={"name": unified_region_column})
+    else:
+        # fallback to last column
+        region_column = gdf_regions.columns[-1]
+        unified_region_column = "region"
+        gdf_joined = gdf_joined.rename(columns={region_column: unified_region_column})
+
+    grouped = gdf_joined.groupby(unified_region_column).agg({
+        "1x": "mean",
+        "5x": "mean",
+        "10x": "mean"
+    }).reset_index()
+
+    return grouped, unified_region_column, gdf_regions

@@ -1,12 +1,14 @@
+
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
-from io import StringIO
+
+
 
 # Color mapping for concentrations
 CONCENTRATION_COLORS = {
-    "Control": "#d4edda",  # Green
-    "1x": "#fff3cd",       # Yellow
+    "Control": "#ffffff",  # White
+    "1x": "#d4edda",       # Green
     "5x": "#ffeeba",       # Orange
     "10x": "#f8d7da",      # Red
 }
@@ -57,22 +59,21 @@ def draw_mortality_donut(title, percentage, color):
     return fig
 
 
-# Show mortality donut charts for selected batch
-def show_mortality_charts(data_tuples):
-    # Let user pick a batch
-    selected_batch = st.selectbox("Select a batch:", [t[0] for t in data_tuples])
-    selected_df = dict(data_tuples)[selected_batch]
+# Main mortality chart function with geojson support
+def show_mortality_charts(grouped, region_column):
+    # Load the GeoJSON as a GeoDataFrame
 
-    # Compute average mortalities
-    mortality_1x = selected_df["1x_Mortality (%)"].mean()
-    mortality_5x = selected_df["5x_Mortality (%)"].mean()
-    mortality_10x = selected_df["10x_Mortality (%)"].mean()
+    if grouped is None or grouped.empty:
+        st.warning("No data matched any region in the GeoJSON.")
+        return
 
-    # Show three side-by-side donut charts
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.pyplot(draw_mortality_donut("1x Mortality", mortality_1x, "#FFA07A"))
-    with col2:
-        st.pyplot(draw_mortality_donut("5x Mortality", mortality_5x, "#FA8072"))
-    with col3:
-        st.pyplot(draw_mortality_donut("10x Mortality", mortality_10x, "#FF6347"))
+    # Dynamically draw a row of donuts per region
+    for _, row in grouped.iterrows():
+        st.markdown(f"### Region: {row[region_column]}")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.pyplot(draw_mortality_donut("1x Mortality", row["1x"], "#FFA07A"))
+        with col2:
+            st.pyplot(draw_mortality_donut("5x Mortality", row["5x"], "#FA8072"))
+        with col3:
+            st.pyplot(draw_mortality_donut("10x Mortality", row["10x"], "#FF6347"))
