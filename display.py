@@ -18,20 +18,20 @@ def main():
     st.title("**D**AR & **T**")
     st.markdown("**D**ashboard **A**carice **R**esistance & **T**racking")
 
-    try:
-        # Assuming this returns the JSON structure as described
-        batch_map, entries = get_data_from_thing()
-        dashboarding(batch_map, entries)
+    # try:
+    #     # Assuming this returns the JSON structure as described
+    #     batch_map, entries = get_data_from_thing()
+    #     dashboarding(batch_map, entries)
 
-    except Exception as e:
-        st.error(f"Failed to load data from API: {e}")
+    # except Exception as e:
+    #     st.error(f"Failed to load data from API: {e}")
 
-        # st.warning("switching to local data for testing purposes.")
-        # with open("./test.json", "r") as f:
-        #     json_data = json.load(f)
-        # entries = json_data["data"]["entries"]
-        # batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
-        # dashboarding(batch_map, entries)
+    st.warning("switching to local data for testing purposes.")
+    with open("./test.json", "r") as f:
+        json_data = json.load(f)
+    entries = json_data["data"]["entries"]
+    batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
+    dashboarding(batch_map, entries)
 
 
 def dashboarding(batch_map, entries):
@@ -160,7 +160,6 @@ def get_data_from_thing(api_url=API_URL,client_id = CLIENT_ID ,client_secret= CL
 
     json_data = response.json() # json response now broken, fix later.
 
-    st.write(json_data)
 
     entries = json_data["data"]["entries"]
 

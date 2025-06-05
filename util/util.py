@@ -65,14 +65,13 @@ def calculate_mortality_percentages(mortality_data: list[tuple[str, pd.DataFrame
     """
     new_mortality_data = []
 
-
     for box_id, df in mortality_data:
         df = df.copy()
 
-        # Automatically find concentration labels (e.g., "1x", "5x", "10x")
+        # Find all concentrations from columns like "1x_Alive"
         concs = set()
         for col in df.columns:
-            if "_Alive" in col:
+            if col.endswith("_Alive"):
                 conc = col.replace("_Alive", "")
                 if f"{conc}_Dead" in df.columns:
                     concs.add(conc)
@@ -85,13 +84,15 @@ def calculate_mortality_percentages(mortality_data: list[tuple[str, pd.DataFrame
             df[mortality_col] = df.apply(
                 lambda row: (
                     (row[dead_col] / (row[alive_col] + row[dead_col]) * 100)
-                    if (row.get(alive_col, 0) + row.get(dead_col, 0)) > 0 else 0.0
+                    if (row[alive_col] + row[dead_col]) > 0 else None
                 ),
                 axis=1
             )
 
         new_mortality_data.append((box_id, df))
+    
     return new_mortality_data
+
 
 
 
@@ -120,10 +121,6 @@ def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json
     # Spatial join: match points to regions
     gdf_joined = gpd.sjoin(gdf_data, gdf_regions, how="inner", predicate="intersects")
 
-
-
-    # TODO: fix this part, the fkin geojson_path is not working
-    # st.write(geojson_path)
     # Determine the region column to use for grouping
     if "NAME_1" in gdf_joined.columns:
         region_column = "NAME_1"
@@ -143,10 +140,15 @@ def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json
         unified_region_column = "region"
         gdf_joined = gdf_joined.rename(columns={region_column: unified_region_column})
 
+    # Exclude None values before calculating mean
+    for col in ["1x", "5x", "10x"]:
+        gdf_joined[col] = pd.to_numeric(gdf_joined[col], errors="coerce")
     grouped = gdf_joined.groupby(unified_region_column).agg({
         "1x": "mean",
         "5x": "mean",
         "10x": "mean"
     }).reset_index()
+
+    grouped[["1x", "5x", "10x"]] = grouped[["1x", "5x", "10x"]].fillna(0.0)
 
     return grouped, unified_region_column, gdf_regions
