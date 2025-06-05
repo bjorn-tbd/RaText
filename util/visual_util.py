@@ -41,7 +41,7 @@ def render_colored_table(df: pd.DataFrame):
 
 
 # Draw a single donut chart for mortality
-def draw_mortality_donut(title, percentage, color):
+def draw_resistance_donut(title, percentage, color):
     fig, ax = plt.subplots()
     sizes = [percentage, 100 - percentage]
     colors = [color, "#e0e0e0"]
@@ -59,21 +59,17 @@ def draw_mortality_donut(title, percentage, color):
     return fig
 
 
-# Main mortality chart function with geojson support
-def show_mortality_charts(grouped, region_column):
-    # Load the GeoJSON as a GeoDataFrame
-
+def show_resistance_charts(grouped, region_column):
     if grouped is None or grouped.empty:
         st.warning("No data matched any region in the GeoJSON.")
         return
 
-    # Dynamically draw a row of donuts per region
     for _, row in grouped.iterrows():
         st.markdown(f"### Region: {row[region_column]}")
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.pyplot(draw_mortality_donut("1x Mortality", row["1x"], "#FFA07A"))
+            st.pyplot(draw_resistance_donut("light resistance", row["1x"], "#d4edda"))
         with col2:
-            st.pyplot(draw_mortality_donut("5x Mortality", row["5x"], "#FA8072"))
+            st.pyplot(draw_resistance_donut("medium Resistance", row["5x"], "#ffeeba"))
         with col3:
-            st.pyplot(draw_mortality_donut("10x Mortality", row["10x"], "#FF6347"))
+            st.pyplot(draw_resistance_donut("high Resistance", row["10x"], "#f8d7da"))

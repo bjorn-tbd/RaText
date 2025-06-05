@@ -2,16 +2,11 @@ import streamlit as st
 import pandas as pd
 import requests
 from util.util import extract_concentration_data, calculate_mortality_percentages, append_region_to_box
-from util.visual_util import render_colored_table, show_mortality_charts
+from util.visual_util import render_colored_table, show_resistance_charts
 import folium
 from streamlit_folium import st_folium
 import json
 
-
-API_URL = "https://five.epicollect.net/api/export/entries/ratext-academy?form_ref=216f96d4dddf431789397be865cc113d_6810df39b9ee1"
-API_TOKEN = "hcZ3P1KhuOvTmC7MvqnMj38LNF0xGtyjJQXEzZ01" # what is data safety?
-CLIENT_ID = 6427
-CLIENT_SECRET = "KIdLBg0ZCLLRLpmbXMuYeddvJ1VUBAAdRLcs26VX"
 
 st.set_page_config(layout="wide", page_icon="./resources/mini.png", page_title="DART Dashboard")
 def main():
@@ -37,14 +32,14 @@ def main():
 def dashboarding(batch_map, entries):
     col1, col2 = st.columns([1, 3])
 
-        # build location map from entries
+    # build location map from entries
     location_map = build_location_map(entries)
 
         # Show logo and map, TOOD: ensure location map is used here, instead of inner calc.
     column_1_map_n_logo(entries, col1)
 
     with col2:
-            # Extract batch data and calculate mortality
+        # Extract batch data and calculate mortality
         RaT_boxnumbers = sorted(batch_map.keys())
         mortality_data = [
                 (box, extract_concentration_data(batch_map[box])) for box in RaT_boxnumbers
@@ -65,19 +60,17 @@ def dashboarding(batch_map, entries):
         grouped, region_column, gdf_regions = append_region_to_box(mortality_data, geojson_path=region_path)
 
         if grouped is not None:
-            # Show subregion selector
             subregions = grouped[region_column].dropna().unique().tolist()
             subregions.sort()
 
             selected_subregion = st.selectbox(f"Select a subregion in {region}:", subregions)
-
-            # Filter grouped data to only show the selected subregion
             filtered_grouped = grouped[grouped[region_column] == selected_subregion]
 
-            # Show charts based on filtered data
-            show_mortality_charts(filtered_grouped, region_column)
-            box_picker(batch_map)
+            # NEW: Show resistance charts
+            show_resistance_charts(filtered_grouped, region_column)
 
+            # Keep your other logic
+            box_picker(batch_map)
         else:
             st.warning("No data available for the selected region.")
 
@@ -113,7 +106,7 @@ def box_picker(batch_map):
 
 def column_1_map_n_logo(entries, col1):
     with col1:
-        st.image("./resources/logo.png")
+        st.image("./resources/logo.png", use_container_width=True)
         st.subheader("Overview Map of Entries")
 
         # Extract valid coordinates
@@ -136,47 +129,5 @@ def column_1_map_n_logo(entries, col1):
         else:
             st.info("No valid location data available to display on the map.")
 
-
-@st.cache_data(ttl=1800)  # Cache for 1800 seconds
-def get_epicollect_token(client_id, client_secret):
-    url = "https://five.epicollect.net/api/oauth/token"
-    params = {
-        "grant_type": "client_credentials",
-        "client_id": client_id,
-        "client_secret": client_secret
-    }
-    headers = {
-        "Content-Type": "application/vnd.api+json"
-    }
-
-    response = requests.post(url, headers=headers, data=json.dumps(params))
-
-    if response.status_code == 200:
-        token_data = response.json()
-        return token_data.get("access_token"), token_data.get("expires_in")
-    else:
-        raise Exception(f"Failed to retrieve token: {response.status_code} {response.text}")
-
-
-# Updated data fetching function with Authorization header
-@st.cache_data(ttl=1800)  # Cache for 1800 seconds (30 minutes)
-def get_data_from_thing(api_url=API_URL,client_id = CLIENT_ID ,client_secret= CLIENT_SECRET):
-    # Get the OAuth token first
-    access_token, expires_in = get_epicollect_token(client_id, client_secret)
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-
-    # Use the token in the GET request
-    response = requests.get(api_url, headers=headers)
-    response.raise_for_status()  # Raises an error if the response status is not 200
-
-    json_data = response.json() # json response now broken, fix later.
-
-
-    entries = json_data["data"]["entries"]
-
-    batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
-    return batch_map, entries
 
 main()
