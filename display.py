@@ -56,17 +56,30 @@ def dashboarding(batch_map, entries):
                 (box, mortality, location_map.get(box)) for (box, mortality) in mortality_data
             ]
 
-            # Now each tuple looks like: (box, mortality_rate, {"latitude": ..., "longitude": ...})
-        supported_countries = ["world", "ecuador"] # TODO: more
+        # Now each tuple looks like: (box, mortality_rate, {"latitude": ..., "longitude": ...})
+        supported_countries = ["world", "ecuador"]  # TODO: more specific.
         region = st.selectbox("Select a region to view:", supported_countries)
-        region_path = "./geojson_files/world.json"
-        if region != "world":
-            region_path = f"./geojson_files/{region}.json"
+
+        region_path = f"./geojson_files/{region}.json" if region != "world" else "./geojson_files/world.json"
 
         grouped, region_column, gdf_regions = append_region_to_box(mortality_data, geojson_path=region_path)
 
-        show_mortality_charts(grouped, region_column)
-        box_picker(batch_map)
+        if grouped is not None:
+            # Show subregion selector
+            subregions = grouped[region_column].dropna().unique().tolist()
+            subregions.sort()
+
+            selected_subregion = st.selectbox(f"Select a subregion in {region}:", subregions)
+
+            # Filter grouped data to only show the selected subregion
+            filtered_grouped = grouped[grouped[region_column] == selected_subregion]
+
+            # Show charts based on filtered data
+            show_mortality_charts(filtered_grouped, region_column)
+            box_picker(batch_map)
+
+        else:
+            st.warning("No data available for the selected region.")
 
 
 def build_location_map(entries):
