@@ -4,7 +4,9 @@ import json
 import geopandas as gpd
 from shapely.geometry import Point
 import streamlit as st
-
+import geopandas as gpd
+from shapely.geometry import Point
+import pandas as pd
 
 def extract_concentration_data(entry: dict) -> pd.DataFrame:
     data = []
@@ -97,21 +99,25 @@ def calculate_mortality_percentages(mortality_data: list[tuple[str, pd.DataFrame
     return new_mortality_data
 
 
-def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json"):
-    import geopandas as gpd
-    from shapely.geometry import Point
-    import pandas as pd
-
+def append_region_to_box(data_tuples, geojson_path: str = r".\geojson_files\global.json") -> tuple[pd.DataFrame, list[pd.DataFrame]]:
     gdf_regions = gpd.read_file(geojson_path)
     records = []
+    updated_dfs = []
 
     def is_resistant(alive, dead):
         total = alive + dead
-        return (total > 0) and (alive / total > 0.25)
+        return (total > 0) and (alive / total >= 0.25)
 
     for batch_name, df, loc in data_tuples:
         if loc is None:
             continue
+
+        # Add location to df
+        df = df.copy()
+        df["latitude"] = loc["latitude"]
+        df["longitude"] = loc["longitude"]
+        updated_dfs.append(df)
+
         point = Point(loc["longitude"], loc["latitude"])
 
         for _, row in df.iterrows():
@@ -120,13 +126,11 @@ def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json
                 r_5x = is_resistant(row["5x_Alive"], row["5x_Dead"])
                 r_10x = is_resistant(row["10x_Alive"], row["10x_Dead"])
 
-                # Apply cascading: resistance at higher level means resistance at lower
                 if r_10x:
                     r_5x = True
                     r_1x = True
                 elif r_5x:
                     r_1x = True
-
             except KeyError:
                 continue
 
@@ -138,12 +142,11 @@ def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json
             })
 
     if not records:
-        return None, None, None
+        return None, None
 
     gdf_data = gpd.GeoDataFrame(records, crs="EPSG:4326")
     gdf_joined = gpd.sjoin(gdf_data, gdf_regions, how="inner", predicate="intersects")
 
-    # Normalize region column name
     for possible in ["NAME_1", "NAME", "name"]:
         if possible in gdf_joined.columns:
             gdf_joined = gdf_joined.rename(columns={possible: "region"})
@@ -152,18 +155,16 @@ def append_region_to_box(data_tuples, geojson_path=r".\geojson_files\global.json
         fallback = gdf_regions.columns[-1]
         gdf_joined = gdf_joined.rename(columns={fallback: "region"})
 
-    # Group and calculate % of resistant strips per region
     grouped = gdf_joined.groupby("region").agg({
         "1x_resistant": "mean",
         "5x_resistant": "mean",
         "10x_resistant": "mean"
     }).reset_index()
 
-    # Convert to %
     grouped["1x"] = grouped["1x_resistant"] * 100
     grouped["5x"] = grouped["5x_resistant"] * 100
     grouped["10x"] = grouped["10x_resistant"] * 100
 
     grouped = grouped[["region", "1x", "5x", "10x"]]
 
-    return grouped, "region", gdf_regions
+    return grouped, updated_dfs

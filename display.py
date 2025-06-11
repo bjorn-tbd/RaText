@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 from util.util import extract_concentration_data, calculate_mortality_percentages, append_region_to_box
-from util.visual_util import render_colored_table, show_resistance_charts
+from util.visual_util import render_colored_table, show_resistance_charts, new_map
+from util.api_util import get_data_from_thing
 import folium
 from streamlit_folium import st_folium
 import json
@@ -13,66 +14,64 @@ def main():
     st.title("**D**AR & **T**")
     st.markdown("**D**ashboard **A**carice **R**esistance & **T**racking")
 
-    # try:
-    #     # Assuming this returns the JSON structure as described
-    #     batch_map, entries = get_data_from_thing()
-    #     dashboarding(batch_map, entries)
+    try:
+        # Assuming this returns the JSON structure as described
+        batch_map, entries = get_data_from_thing()
+        dashboarding(batch_map, entries)
 
-    # except Exception as e:
-    #     st.error(f"Failed to load data from API: {e}")
+    except Exception as e:
+        st.error(f"Failed to load data from API: {e}")
 
-    st.warning("switching to local data for testing purposes.")
-    with open("./test.json", "r") as f:
-        json_data = json.load(f)
-    entries = json_data["data"]["entries"]
-    batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
-    dashboarding(batch_map, entries)
+    # st.warning("switching to local data for testing purposes.")
+    # with open("./test3.json", "r") as f:
+    #     json_data = json.load(f)
+    # entries = json_data["data"]["entries"]
+    # batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
+    # dashboarding(batch_map, entries)
 
 
 def dashboarding(batch_map, entries):
-    col1, col2 = st.columns([1, 3])
 
     # build location map from entries
     location_map = build_location_map(entries)
+    # Extract batch data and calculate mortality
+    RaT_boxnumbers = sorted(batch_map.keys())
+    mortality_data = [
+            (box, extract_concentration_data(batch_map[box])) for box in RaT_boxnumbers
+        ]
+    mortality_data = calculate_mortality_percentages(mortality_data)
 
-        # Show logo and map, TOOD: ensure location map is used here, instead of inner calc.
-    column_1_map_n_logo(entries, col1)
+        # Step 2: Append location data to mortality_data tuples
+    mortality_data = [
+            (box, mortality, location_map.get(box)) for (box, mortality) in mortality_data
+        ]
 
-    with col2:
-        # Extract batch data and calculate mortality
-        RaT_boxnumbers = sorted(batch_map.keys())
-        mortality_data = [
-                (box, extract_concentration_data(batch_map[box])) for box in RaT_boxnumbers
-            ]
-        mortality_data = calculate_mortality_percentages(mortality_data)
+    # Now each tuple looks like: (box, mortality_rate, {"latitude": ..., "longitude": ...})
+    supported_countries = ["world", "ecuador", "uruguay"]  # TODO: more specific.
+    region = st.selectbox("Select a region to view:", supported_countries)
 
-            # Step 2: Append location data to mortality_data tuples
-        mortality_data = [
-                (box, mortality, location_map.get(box)) for (box, mortality) in mortality_data
-            ]
+    region_path = f"./geojson_files/{region}.json" if region != "world" else "./geojson_files/world.json"
+    grouped, raw_coords = append_region_to_box(mortality_data, geojson_path=region_path)
 
-        # Now each tuple looks like: (box, mortality_rate, {"latitude": ..., "longitude": ...})
-        supported_countries = ["world", "ecuador"]  # TODO: more specific.
-        region = st.selectbox("Select a region to view:", supported_countries)
+    if grouped is not None:
+        subregions = grouped["region"].dropna().unique().tolist()
+        subregions.sort()
 
-        region_path = f"./geojson_files/{region}.json" if region != "world" else "./geojson_files/world.json"
+        selected_subregion = st.selectbox(f"Select a subregion in {region}:", subregions)
+        filtered_grouped = grouped[grouped["region"] == selected_subregion]
 
-        grouped, region_column, gdf_regions = append_region_to_box(mortality_data, geojson_path=region_path)
+        # NEW: Show resistance charts
+        show_resistance_charts(filtered_grouped, "region")
 
-        if grouped is not None:
-            subregions = grouped[region_column].dropna().unique().tolist()
-            subregions.sort()
-
-            selected_subregion = st.selectbox(f"Select a subregion in {region}:", subregions)
-            filtered_grouped = grouped[grouped[region_column] == selected_subregion]
-
-            # NEW: Show resistance charts
-            show_resistance_charts(filtered_grouped, region_column)
-
-            # Keep your other logic
+        # Show the map with the selected subregion
+        st.subheader(f"Map of {selected_subregion} with Batch Locations")
+        new_map(raw_coords)
+        
+        # Keep your other logic
+        with st.expander("Show Batch Details"):
             box_picker(batch_map)
-        else:
-            st.warning("No data available for the selected region.")
+    else:
+        st.warning("No data available for the selected region.")
 
 
 def build_location_map(entries):
