@@ -12,7 +12,7 @@ import json
 st.set_page_config(layout="wide", page_icon="./resources/mini.png", page_title="DART Dashboard")
 def main():
     st.title("**D**AR & **T**")
-    st.markdown("**D**ashboard **A**carice **R**esistance & **T**racking")
+    st.markdown("**D**ashboard **A**caricide **R**esistance & **T**racking")
 
     try:
         # Assuming this returns the JSON structure as described
@@ -77,8 +77,8 @@ def dashboarding(batch_map, entries):
 def build_location_map(entries):
     location_map = {}
     for entry in entries:
-        box_name = entry.get("16_batch_number")  # Adjust key if needed
-        loc = entry.get("17_location", {})
+        box_name = entry.get("2_RaText_batch_numbe")  # Adjust key if needed
+        loc = entry.get("3_Location_of_the_fa", {})
         lat = loc.get("latitude")
         lon = loc.get("longitude")
         try:
@@ -111,7 +111,7 @@ def column_1_map_n_logo(entries, col1):
         # Extract valid coordinates
         coords = []
         for entry in entries:
-            loc = entry.get("17_location", {}) #TODO: make this dynamic, so we can use it for other entries.
+            loc = entry.get("3_Location_of_the_fa", {}) #TODO: make this dynamic, so we can use it for other entries.
             lat = loc.get("latitude")
             lon = loc.get("longitude")
 

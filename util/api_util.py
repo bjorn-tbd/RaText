@@ -48,5 +48,5 @@ def get_data_from_thing(api_url=API_URL,client_id = CLIENT_ID ,client_secret= CL
 
     entries = json_data["data"]["entries"]
 
-    batch_map = {entry["16_batch_number"]: entry for entry in entries if entry.get("16_batch_number")}
+    batch_map = {entry["2_RaText_batch_numbe"]: entry for entry in entries if entry.get("2_RaText_batch_numbe")}
     return batch_map, entries
